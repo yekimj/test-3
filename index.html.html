@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>페르소나 챗</title>
+    
+    <!-- (PWA, 폰트, Tailwind 등 기존 <head> 내용은 동일) -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="페르소나 챗">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
+    <link rel="icon" href="icon-192x192.png" type="image/png">
+    <meta name="theme-color" content="#1f2937">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #2d3748; }
+        ::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #718096; }
+        #chat-display { scroll-behavior: smooth; }
+        body { min-height: 100dvh; }
+        #app-container {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        #chat-form {
+             padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+        }
+        /* ✨ NEW: 불러오기/삭제 버튼 스타일 */
+        .btn-chat-action {
+            padding: 2px 6px;
+            font-size: 0.75rem; /* 12px */
+            border-radius: 4px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .btn-chat-load {
+            border-color: #3b82f6; /* blue-500 */
+            color: #3b82f6;
+        }
+        .btn-chat-load:hover {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-chat-delete-save {
+            border-color: #ef4444; /* red-500 */
+            color: #ef4444;
+        }
+        .btn-chat-delete-save:hover {
+            background-color: #ef4444;
+            color: white;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white">
+
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 z-40 hidden md:hidden"></div>
+
+    <div id="app-container" class="flex flex-col md:flex-row w-full" style="height: 100dvh; overflow: hidden;">
+
+        <!-- 1. 설정 사이드바 -->
+        <div id="sidebar" class="w-full md:w-1/3 lg:w-1/4 bg-gray-800 p-4 overflow-y-auto 
+            fixed inset-y-0 left-0 z-50 transform -translate-x-full md:relative md:translate-x-0 
+            transition-transform duration-300 ease-in-out md:flex-shrink-0
+            pb-24 md:pb-4">
+            
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white">페르소나 설정</h2>
+                <button id="btn-close-sidebar" class="md:hidden p-1 rounded-full hover:bg-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- (페르소나, 세계관, 장기기억, 모델 선택 등 기존 섹션은 동일) -->
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <label for="char-persona" class="block text-sm font-medium text-blue-300">캐릭터의 페르소나</label>
+                    <button id="btn-suggest-persona" class="text-xs bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded-lg transition-all shadow-md active:scale-95">
+                        ✨ 추천
+                    </button>
+                </div>
+                <textarea id="char-persona" rows="8"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="예: 에스파의 'Supernova'를 표절했다는 논란에 싸인 모차르트."
+                ></textarea>
+            </div>
+            <div class="mt-4">
+                <label for="user-persona" class="block mb-2 text-sm font-medium text-green-300">유저의 페르소나</label>
+                <textarea id="user-persona" rows="4"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-green-500 focus:border-green-500"
+                    placeholder="예: 그런 그를 흥미롭게 바라보는 살리에리."
+                ></textarea>
+            </div>
+            <div class="mt-4">
+                <label for="worldview-setting" class="block mb-2 text-sm font-medium text-cyan-300">세계관</label>
+                <textarea id="worldview-setting" rows="6"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-cyan-500 focus:border-cyan-500"
+                    placeholder="예: 여기는 2077년, 사이버펑크 도시. AI는 인간의 조력자이지만, 기업들의 감시를 받고 있다."
+                ></textarea>
+            </div>
+            <div class="mt-4">
+                <div class="flex justify-between items-center mb-2">
+                    <label for="memory" class="block text-sm font-medium text-yellow-300">장기 기억</label>
+                    <button id="btn-extract-memory" class="text-xs bg-yellow-600 hover:bg-yellow-700 text-white py-1 px-2 rounded-lg transition-all shadow-md active:scale-95">
+                        ✨ 기억 추출
+                    </button>
+                </div>
+                <textarea id="memory" rows="10"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-yellow-500 focus:border-yellow-500"
+                    placeholder="예:
+- 나의 이름은 [내 이름]이다.
+- 나는 초콜릿을 싫어한다.
+- 나의 생일은 10월 23일이다."
+                ></textarea>
+            </div>
+            <div class="mt-4">
+                <label for="model-select" class="block mb-2 text-sm font-medium text-purple-300">모델 선택</label>
+                <select id="model-select" class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-purple-500 focus:border-purple-500">
+                    <option value="gemini-2.5-pro" selected>Pro2.5 (기본값)</option>
+                    <option value="gemini-3.1-pro-preview" >Pro3.1 (최고성능)</option>
+                    <option value="gemini-3-pro-preview" >pro3 (기존성능)</option>
+                    <option value="gemini-3-flash-preview" >Pro3flash (밤티성능)</option>
+                </select>
+            </div>
+            
+            <!-- ✨✨✨ NEW (y 요청): 채팅 저장/불러오기 섹션 ✨✨✨ -->
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <h3 class="text-lg font-bold text-teal-300 mb-3">채팅 저장/불러오기</h3>
+                
+                <!-- 현재 채팅 저장 버튼 -->
+                <button id="btn-save-current-chat"
+                        class="w-full px-4 py-2 mb-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-all shadow-md active:scale-95 font-semibold">
+                    현재 채팅 저장하기...
+                </button>
+
+                <!-- ✨ NEW: 텍스트 파일 불러오기 버튼 (네 다음 아이디어) -->
+                <button id="btn-import-txt"
+                        class="w-full px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all shadow-md active:scale-95 font-semibold">
+                    ...(.txt) 파일에서 불러오기
+                </button>
+                <input type="file" id="file-importer" accept=".txt" class="hidden">
+
+
+                <!-- 저장된 채팅 목록 -->
+                <label class="block text-sm font-medium text-gray-400 mt-4 mb-2">저장된 채팅 목록 (브라우저)</label>
+                <div id="saved-chats-list" 
+                     class="max-h-48 overflow-y-auto space-y-2 bg-gray-900/50 p-2 rounded-lg border border-gray-700">
+                    <!-- JS로 여기에 목록이 채워집니다 -->
+                    <p class="text-xs text-gray-500">저장된 채팅이 없습니다.</p>
+                </div>
+            </div>
+
+
+            <!-- API 키 관리 섹션 (순서 변경) -->
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <label for="api-key-input" class="block mb-2 text-sm font-medium text-orange-300">API 키 관리</label>
+                <p class="text-xs text-gray-400 mb-2">
+                    이 키는 이 브라우저(폰)에만 저장됩니다.
+                </p>
+                <div class="flex space-x-2">
+                    <input type="password" id="api-key-input"
+                           class="flex-1 p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-orange-500 focus:border-orange-500"
+                           placeholder="AIzaSy... (Gemini API 키 붙여넣기)">
+                    <button id="btn-save-key"
+                            class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-all shadow-md active:scale-95">
+                        저장
+                    </button>
+                </div>
+                 <button id="btn-show-key"
+                    class="mt-2 text-xs text-gray-400 hover:text-white">
+                    (키 보이기)
+                </button>
+            </div>
+
+        </div>
+
+        <!-- 2. 채팅 영역 -->
+        <div class="flex-1 flex flex-col overflow-hidden"> 
+            
+            <!-- (채팅 표시, 로딩 인디케이터 등 기존 HTML 동일) -->
+            <div id="chat-display" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-900">
+                <div id="welcome-message" class="p-3 rounded-lg bg-gray-700 self-start max-w-xs md:max-w-md">
+                    <span class="font-bold block text-blue-300">AI</span>
+                    <p class="text-white">안녕하세요! 하단의 (☰) 버튼으로 페르소나를 설정한 후 저에게 말을 걸어주세요.</p>
+                </div>
+                <div id="api-key-alert" class="p-3 rounded-lg bg-red-700 self-start mr-auto hidden">
+                    <span class="font-bold block text-red-200">시스템</span>
+                    <p class="text-white">
+                        Gemini API 키가 설정되지 않았습니다.
+                        <br>
+                        채팅을 시작하려면, (☰) 버튼을 눌러 사이드바 하단의 'API 키 관리' 메뉴에서 본인의 API 키를 입력하고 저장해주세요.
+                    </p>
+                </div>
+            </div>
+
+            <div id="loading" class="p-4 hidden flex items-center justify-center flex-shrink-0">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-gray-400">AI가 응답을 생성 중입니다...</span>
+            </div>
+
+            <!-- (채팅 입력 폼 및 하단 버튼 바 기존 HTML 동일) -->
+            <form id="chat-form" class="p-4 bg-gray-800 border-t border-gray-700 md:border-l flex-shrink-0">
+                <div class="pb-2 flex justify-end items-center space-x-2">
+                    <button id="btn-download" type="button" class="p-1 rounded-md hover:bg-gray-700" title="채팅 기록 다운로드 (.txt)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                    </button>
+                    <button id="btn-regenerate" type="button" class="p-1 rounded-md hover:bg-gray-700" title="마지막 AI 답변 재생성">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2a8.001 8.001 0 0015.357 2m0 0H15" />
+                        </svg>
+                    </button>
+                    <button id="btn-clear-chat" type="button" class="p-1 rounded-md hover:bg-gray-700" title="채팅 기록 삭제 (저장된 기록 포함)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                    <button id="btn-open-sidebar" type="button" class="md:hidden p-1 rounded-md hover:bg-gray-700" title="페르소나 설정 열기">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="flex space-x-2">
+                    <textarea id="chat-input" rows="1"
+                        style="resize: none; max-height: 120px; overflow-y: auto;"
+                        class="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        placeholder="(Shift+Enter로 전송)" autocomplete="off"></textarea>
+                    <button id="send-button" type="submit"
+                        class="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-200">
+                        전송
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 
+      ✨✨✨ NEW (y 요청): "채팅 저장" 모달
+      기존 "삭제 확인" 모달을 복사해서 만들었습니다.
+    -->
+    <div id="save-modal-backdrop" class="fixed inset-0 bg-black/70 z-[100] hidden"></div>
+    <div id="save-modal" 
+         class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+                bg-gray-800 rounded-lg shadow-xl z-[101] 
+                w-11/12 max-w-md p-6 hidden
+                border border-gray-700">
+        
+        <h3 class="text-lg font-bold text-white mb-4">현재 채팅 저장하기</h3>
+        <p class="text-gray-300 mb-4">
+            이 채팅 세션의 제목을 입력하세요. 페르소나, 세계관, 장기 기억, 그리고 모든 대화 내용이 브라우저에 저장됩니다.
+        </p>
+        
+        <!-- 채팅 제목 입력 -->
+        <input type="text" id="chat-title-input" 
+               class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-teal-500 focus:border-teal-500"
+               placeholder="예: 모차르트와 살리에리 대화 (1)">
+        
+        <div class="flex justify-end space-x-3 mt-6">
+            <button id="btn-modal-cancel-save" type="button" 
+                    class="px-5 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-medium transition-all active:scale-95">
+                취소
+            </button>
+            <button id="btn-modal-confirm-save" type="button" 
+                    class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-all active:scale-95">
+                저장
+            </button>
+        </div>
+    </div>
+
+    <!-- (기존) 삭제 확인 모달 -->
+    <div id="confirm-modal-backdrop" class="fixed inset-0 bg-black/70 z-[100] hidden"></div>
+    <div id="confirm-modal" 
+         class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+                bg-gray-800 rounded-lg shadow-xl z-[101] 
+                w-11/12 max-w-md p-6 hidden
+                border border-gray-700">
+        
+        <h3 class="text-lg font-bold text-white mb-4">정말 삭제하시겠습니까?</h3>
+        <p class="text-gray-300 mb-6">전체 대화 내용이 영구적으로 삭제되며, 복구할 수 없습니다.</p>
+        <div class="flex justify-end space-x-3">
+            <button id="btn-modal-cancel" type="button" 
+                    class="px-5 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-medium transition-all active:scale-95">
+                취소
+            </button>
+            <button id="btn-modal-confirm-delete" type="button" 
+                    class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all active:scale-95">
+                삭제
+            </button>
+        </div>
+    </div>
+
+
+    <!-- 
+        ============================================================
+        자바스크립트 코드
+        ============================================================
+    -->
+    <script type="module">
+        // 1. 전역 변수 및 DOM 요소 가져오기
+        const chatDisplay = document.getElementById('chat-display');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const sendButton = document.getElementById('send-button');
+        const loadingIndicator = document.getElementById('loading');
+        
+        const charPersonaInput = document.getElementById('char-persona');
+        const userPersonaInput = document.getElementById('user-persona');
+        const worldviewInput = document.getElementById('worldview-setting');
+        const memoryInput = document.getElementById('memory');
+        const btnSuggestPersona = document.getElementById('btn-suggest-persona');
+        const btnExtractMemory = document.getElementById('btn-extract-memory');
+        
+        const modelSelect = document.getElementById('model-select');
+        
+        const sidebar = document.getElementById('sidebar');
+        const btnOpenSidebar = document.getElementById('btn-open-sidebar');
+        const btnCloseSidebar = document.getElementById('btn-close-sidebar');
+        const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+        
+        const apiKeyInput = document.getElementById('api-key-input');
+        const btnSaveKey = document.getElementById('btn-save-key');
+        const btnShowKey = document.getElementById('btn-show-key');
+        const apiKeyAlert = document.getElementById('api-key-alert');
+        const API_KEY_STORAGE_ID = 'gemini-api-key';
+
+        const btnDownload = document.getElementById('btn-download');
+        const btnRegenerate = document.getElementById('btn-regenerate');
+        const btnClearChat = document.getElementById('btn-clear-chat'); 
+        const CHAT_HISTORY_STORAGE_ID = 'gemini-chat-history';
+
+        // ✨ NEW: 삭제 확인 모달 DOM
+        const confirmModalBackdrop = document.getElementById('confirm-modal-backdrop');
+        const confirmModal = document.getElementById('confirm-modal');
+        const btnModalCancel = document.getElementById('btn-modal-cancel');
+        const btnModalConfirmDelete = document.getElementById('btn-modal-confirm-delete');
+
+        // ✨✨✨ NEW (y 요청): 채팅 저장/불러오기 관련 DOM 및 상수 ✨✨✨
+        const btnSaveCurrentChat = document.getElementById('btn-save-current-chat');
+        const savedChatsList = document.getElementById('saved-chats-list');
+        const saveModalBackdrop = document.getElementById('save-modal-backdrop');
+        const saveModal = document.getElementById('save-modal');
+        const btnModalCancelSave = document.getElementById('btn-modal-cancel-save');
+        const btnModalConfirmSave = document.getElementById('btn-modal-confirm-save');
+        const chatTitleInput = document.getElementById('chat-title-input');
+        const SAVED_CHATS_STORAGE_ID = 'gemini-saved-chats'; // 저장된 채팅 '목록' 키
+
+        // ✨✨✨ NEW (y 요청): TXT 파일 불러오기 관련 DOM ✨✨✨
+        const btnImportTxt = document.getElementById('btn-import-txt');
+        const fileImporter = document.getElementById('file-importer');
+
+
+        const SETTINGS_STORAGE_KEYS = {
+            charPersona: 'gemini-settings-char-persona',
+            userPersona: 'gemini-settings-user-persona',
+            worldview: 'gemini-settings-worldview',
+            memory: 'gemini-settings-memory',
+            model: 'gemini-settings-model'
+        };
+
+        let userApiKey = ""; 
+        let modelName = "gemini-2.5-flash"; 
+        let chatHistory = [];
+
+        // 2. 이벤트 리스너
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            loadApiKey();
+            loadSettings(); 
+            loadChatHistory(); // ✨ 중요: 설정 로드 후 채팅 로드
+            loadSavedChatsList(); // ✨ NEW: 저장된 채팅 목록 불러오기
+        });
+        
+        chatForm.addEventListener('submit', handleSendChat);
+        sendButton.addEventListener('click', handleSendChat);
+
+        chatInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.shiftKey) {
+                e.preventDefault(); 
+                chatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
+        });
+
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+        
+        btnSuggestPersona.addEventListener('click', handleSuggestPersona);
+        btnExtractMemory.addEventListener('click', handleExtractMemory);
+        
+        btnDownload.addEventListener('click', handleDownload);
+        btnRegenerate.addEventListener('click', handleRegenerate);
+        btnClearChat.addEventListener('click', showClearConfirmModal); 
+        
+        // (기존) 삭제 모달 리스너
+        btnModalCancel.addEventListener('click', hideClearConfirmModal);
+        btnModalConfirmDelete.addEventListener('click', () => {
+            executeClearChat(); 
+            hideClearConfirmModal(); 
+        });
+
+        // (기존) 사이드바 리스너
+        btnOpenSidebar.addEventListener('click', () => {
+            sidebar.classList.remove('-translate-x-full');
+            sidebarBackdrop.classList.remove('hidden');
+        });
+        btnCloseSidebar.addEventListener('click', () => {
+            sidebar.classList.add('-translate-x-full');
+            sidebarBackdrop.classList.add('hidden');
+        });
+        sidebarBackdrop.addEventListener('click', () => {
+            btnCloseSidebar.click();
+        });
+        
+        // (기존) 개별 메시지 삭제 리스너
+        chatDisplay.addEventListener('click', function(e) {
+            const deleteButton = e.target.closest('.btn-delete');
+            if (deleteButton) {
+                e.stopPropagation(); 
+                const bubble = deleteButton.closest('[data-id]');
+                if (bubble) {
+                    const idToDelete = bubble.dataset.id;
+                    bubble.remove();
+                    chatHistory = chatHistory.filter(msg => String(msg.id) !== String(idToDelete));
+                    saveChatHistory(); 
+                }
+            }
+        });
+
+        // (기존) API 키 리스너
+        btnSaveKey.addEventListener('click', handleSaveKey);
+        btnShowKey.addEventListener('click', () => {
+             if (apiKeyInput.type === 'password') {
+                apiKeyInput.type = 'text';
+                btnShowKey.textContent = '(키 숨기기)';
+            } else {
+                apiKeyInput.type = 'password';
+                btnShowKey.textContent = '(키 보이기)';
+            }
+        });
+
+        // (기존) 설정 변경 리스너
+        charPersonaInput.addEventListener('change', saveSettings);
+        userPersonaInput.addEventListener('change', saveSettings);
+        worldviewInput.addEventListener('change', saveSettings);
+        memoryInput.addEventListener('change', saveSettings);
+        modelSelect.addEventListener('change', saveSettings); 
+
+        
+        // ✨✨✨ NEW (y 요청): 채팅 저장/불러오기 리스너 ✨✨✨
+
+        // "현재 채팅 저장하기..." 버튼 클릭
+        btnSaveCurrentChat.addEventListener('click', showSaveModal);
+
+        // (저장 모달) "취소" 버튼
+        btnModalCancelSave.addEventListener('click', hideSaveModal);
+
+        // (저장 모달) "저장" 버튼
+        btnModalConfirmSave.addEventListener('click', handleSaveChat);
+
+        // (사이드바 목록) 불러오기/삭제 버튼 클릭 (이벤트 위임)
+        savedChatsList.addEventListener('click', handleSavedChatListClick);
+
+        // ✨✨✨ NEW (y 요청): TXT 파일 불러오기 리스너 ✨✨✨
+        btnImportTxt.addEventListener('click', () => {
+            // 숨겨진 file input을 클릭
+            fileImporter.click();
+        });
+
+        fileImporter.addEventListener('change', handleImportFile);
+
+
+        // 3. API 키 및 채팅 저장/로드 함수 (localStorage)
+        
+        function loadApiKey() {
+            const savedKey = localStorage.getItem(API_KEY_STORAGE_ID);
+            if (savedKey) {
+                userApiKey = savedKey;
+                apiKeyInput.value = savedKey; 
+                apiKeyAlert.classList.add('hidden'); 
+            } else {
+                apiKeyAlert.classList.remove('hidden'); 
+                userApiKey = "";
+            }
+        }
+
+        function handleSaveKey(e) {
+            e.preventDefault();
+            const newKey = apiKeyInput.value.trim();
+            if (newKey && newKey.startsWith("AIzaSy")) {
+                userApiKey = newKey;
+                localStorage.setItem(API_KEY_STORAGE_ID, newKey);
+                apiKeyAlert.classList.add('hidden'); 
+                displayMessage("API 키가 브라우저에 안전하게 저장되었습니다.", 'model');
+                if (window.innerWidth < 768) {
+                    btnCloseSidebar.click();
+                }
+            } else {
+                displayMessage("올바른 Gemini API 키 (AIzaSy...)를 입력하세요.", 'error');
+                userApiKey = "";
+                localStorage.removeItem(API_KEY_STORAGE_ID); 
+                apiKeyAlert.classList.remove('hidden'); 
+            }
+        }
+
+        /**
+         * (기존) 현재 설정을 localStorage에 저장
+         */
+        function saveSettings() {
+            localStorage.setItem(SETTINGS_STORAGE_KEYS.charPersona, charPersonaInput.value);
+            localStorage.setItem(SETTINGS_STORAGE_KEYS.userPersona, userPersonaInput.value);
+            localStorage.setItem(SETTINGS_STORAGE_KEYS.worldview, worldviewInput.value);
+            localStorage.setItem(SETTINGS_STORAGE_KEYS.memory, memoryInput.value);
+            localStorage.setItem(SETTINGS_STORAGE_KEYS.model, modelSelect.value);
+            modelName = modelSelect.value; 
+        }
+
+        /**
+         * (기존) localStorage에서 현재 설정을 불러와 UI에 적용
+         */
+        function loadSettings() {
+            charPersonaInput.value = localStorage.getItem(SETTINGS_STORAGE_KEYS.charPersona) || '';
+            userPersonaInput.value = localStorage.getItem(SETTINGS_STORAGE_KEYS.userPersona) || '';
+            worldviewInput.value = localStorage.getItem(SETTINGS_STORAGE_KEYS.worldview) || '';
+            memoryInput.value = localStorage.getItem(SETTINGS_STORAGE_KEYS.memory) || '';
+            
+            const savedModel = localStorage.getItem(SETTINGS_STORAGE_KEYS.model);
+            if (savedModel) {
+                modelName = savedModel;
+                modelSelect.value = savedModel;
+            } else {
+                modelName = modelSelect.value; 
+            }
+        }
+
+        /**
+         * (기존) 현재 채팅 기록(chatHistory)을 localStorage에 저장
+         */
+        function saveChatHistory() {
+            if (chatHistory && chatHistory.length > 0) {
+                localStorage.setItem(CHAT_HISTORY_STORAGE_ID, JSON.stringify(chatHistory));
+            } else {
+                localStorage.removeItem(CHAT_HISTORY_STORAGE_ID);
+            }
+        }
+
+        /**
+         * (기존) localStorage에서 현재 채팅 기록을 불러와 UI에 렌더링
+         */
+        function loadChatHistory() {
+            const savedHistory = localStorage.getItem(CHAT_HISTORY_STORAGE_ID);
+            // ✨ 중요: chatDisplay를 먼저 비우고 시작
+            chatDisplay.innerHTML = ''; 
+            
+            if (savedHistory) {
+                chatHistory = JSON.parse(savedHistory);
+                chatHistory.forEach(msg => {
+                    if (msg.parts && msg.parts[0] && msg.parts[0].text) {
+                         displayMessage(msg.parts[0].text, msg.role, msg.id);
+                    }
+                });
+            } else {
+                chatHistory = [];
+                // 채팅 기록이 없으면, 웰컴 메시지나 API 키 알림을 다시 표시
+                if (!userApiKey) {
+                    apiKeyAlert.classList.remove('hidden');
+                    chatDisplay.appendChild(apiKeyAlert);
+                } else {
+                    const welcomeMsg = document.getElementById('welcome-message');
+                    if (welcomeMsg) chatDisplay.appendChild(welcomeMsg.cloneNode(true));
+                }
+            }
+        }
+
+
+        /**
+         * 4. 폼 제출 (메시지 전송) 핸들러
+         */
+        async function handleSendChat(event) {
+            // (이 함수 내용은 변경 없음 - 기존과 동일)
+            event.preventDefault(); 
+            if (!userApiKey) {
+                apiKeyAlert.classList.remove('hidden'); 
+                displayMessage("API 키가 없습니다. (☰) 버튼을 눌러 키를 먼저 저장하세요.", 'error');
+                if (window.innerWidth < 768) { 
+                    btnOpenSidebar.click();
+                }
+                return;
+            }
+            let prompt = chatInput.value.trim();
+            const userMessageId = Date.now() + '-user';
+            let displayUserMessage = true; 
+            if (prompt !== "") {
+                chatInput.value = ""; 
+                chatInput.style.height = 'auto';
+                displayUserMessage = true; 
+            } else {
+                if (chatHistory.length === 0) {
+                    displayMessage('대화를 시작하려면 먼저 메시지를 입력해주세요.', 'model');
+                    return;
+                }
+                if (!loadingIndicator.classList.contains('hidden')) {
+                    return; 
+                }
+                prompt = "(사용자가 다음 차례를 넘겼다. 현재까지의 대화 흐름을 이어받아, 당신의 캐릭터가 할 다음 행동이나 대사, 혹은 주변 상황에 대한 묘사를 통해 이야기를 진행시키세요.)";
+                displayUserMessage = false; 
+            }
+            if (displayUserMessage) {
+                displayMessage(prompt, 'user', userMessageId);
+            }
+            chatHistory.push({
+                id: userMessageId,
+                role: "user",
+                parts: [{ text: prompt }]
+            });
+            saveChatHistory(); 
+            loadingIndicator.classList.remove('hidden');
+            try {
+                const systemPrompt = buildSystemPrompt();
+                const CONVERSATION_WINDOW_SIZE = 10;
+                const recentHistory = chatHistory.slice(-CONVERSATION_WINDOW_SIZE);
+                const text = await callGeminiApi(recentHistory, systemPrompt, userApiKey);
+                const modelMessageId = Date.now() + '-model';
+                displayMessage(text, 'model', modelMessageId);
+                chatHistory.push({
+                    id: modelMessageId,
+                    role: "model",
+                    parts: [{ text: text }]
+                });
+                saveChatHistory(); 
+            } catch (error) {
+                console.error("Error in handleSendChat:", error);
+                if (error.message && (error.message.includes('401') || error.message.includes('403') || error.message.includes('API key not valid'))) {
+                     displayMessage(`API 키 인증 오류가 발생했습니다. 키가 올바른지 확인하거나, 키 설정이 Google AI Studio에서 올바르게 되었는지 확인하세요.`, 'error');
+                     apiKeyAlert.classList.remove('hidden'); 
+                } else if (error.message && error.message.includes('400')) {
+                     displayMessage(`Server error: 400 (Bad Request). API 키는 맞지만 요청 내용(JSON 형식 등)을 서버가 거부했습니다.`, 'error');
+                } else if (error.message && error.message.includes('fetch')) {
+                     displayMessage(`네트워크 오류: API 서버에 연결할 수 없습니다. (주소: ${error.message})`, 'error');
+                }
+                 else {
+                     displayMessage(`오류가 발생했습니다: ${error.message}`, 'error');
+                }
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                if (window.innerWidth < 768) {
+                    btnCloseSidebar.click();
+                }
+            }
+        }
+
+        // ---
+        // 5. 기능 함수 (삭제, 추천, 추출, 다운로드, 재생성)
+        // ---
+
+        // (기존) 삭제 모달 함수
+        function showClearConfirmModal() {
+            if (chatHistory.length === 0) {
+                 displayMessage('삭제할 대화 내용이 없습니다.', 'error');
+                return;
+            }
+            confirmModalBackdrop.classList.remove('hidden');
+            confirmModal.classList.remove('hidden');
+        }
+        function hideClearConfirmModal() {
+            confirmModalBackdrop.classList.add('hidden');
+            confirmModal.classList.add('hidden');
+        }
+        /**
+         * (기존) '현재 채팅'을 비우는 함수 (UI + chatHistory 변수 + localStorage)
+         */
+        function executeClearChat() {
+            chatHistory = [];
+            saveChatHistory(); // localStorage에서 'gemini-chat-history' 삭제
+            loadChatHistory(); // UI 비우고 웰컴/API키 메시지 표시
+        }
+
+        // (기존) 페르소나 추천
+        async function handleSuggestPersona(e) {
+            // (이 함수 내용은 변경 없음 - 기존과 동일)
+            e.preventDefault(); 
+            if (!userApiKey) {
+                 displayMessage("API 키가 없습니다. '✨ 추천' 기능을 사용하려면 먼저 키를 저장하세요.", 'error');
+                 if (window.innerWidth < 768) btnOpenSidebar.click();
+                 return;
+            }
+            const originalText = btnSuggestPersona.textContent;
+            btnSuggestPersona.disabled = true;
+            btnSuggestPersona.textContent = '생성 중...';
+            const prompt = "당신은 창의적인 작가입니다. AI 채팅 앱에서 사용할 수 있는 독특하고 재미있는 '캐릭터 페르소나' 아이디어 3가지를 추천해 주세요. 각 아이디어는 2~3줄로 설명하고, '---'로 구분해 주세요.";
+            try {
+                const text = await callGeminiApi(
+                    [{ role: "user", parts: [{ text: prompt }] }],
+                    null, 
+                    userApiKey 
+                );
+                if (text.trim() === "") {
+                     displayMessage('✨ 추천할 아이디어가 떠오르지 않습니다. 다시 시도해 주세요.', 'error');
+                } else {
+                    charPersonaInput.value = text;
+                    saveSettings(); 
+                    displayMessage('✨ AI가 새로운 페르소나 아이디어를 추천했습니다. 사이드바를 확인하세요!', 'model');
+                }
+            } catch (error) {
+                console.error("Error in handleSuggestPersona:", error);
+                displayMessage(`페르소나 추천 중 오류 발생: ${error.message}`, 'error');
+            } finally {
+                btnSuggestPersona.disabled = false;
+                btnSuggestPersona.textContent = originalText;
+            }
+        }
+
+        // (기존) 기억 추출
+        async function handleExtractMemory(e) {
+            // (이 함수 내용은 변경 없음 - 기존과 동일)
+            e.preventDefault();
+            if (!userApiKey) {
+                 displayMessage("API 키가 없습니다. '✨ 기억 추출' 기능을 사용하려면 먼저 키를 저장하세요.", 'error');
+                 if (window.innerWidth < 768) btnOpenSidebar.click();
+                 return;
+            }
+            if (chatHistory.length === 0) {
+                displayMessage('아직 대화 내역이 없습니다.', 'error');
+                return;
+            }
+            const originalText = btnExtractMemory.textContent;
+            btnExtractMemory.disabled = true;
+            btnExtractMemory.textContent = '추출 중...';
+            const systemPrompt = `
+당신은 매우 꼼꼼한 비서입니다.
+제공되는 대화 내역(\`contents\`)을 분석하여, 'user'(사용자)에 대한 핵심 정보(이름, 나이, 좋아하는 것, 싫어하는 것, 약속, 중요한 사건 등)를 요약해 주세요.
+'장기 기억' 탭에 추가할 수 있도록, 각 항목을 글머리 기호(-)로 구분하여 목록으로만 응답해 주세요.
+            `.trim();
+            try {
+                const text = await callGeminiApi(
+                    chatHistory, 
+                    systemPrompt,
+                    userApiKey 
+                );
+                if (text.trim() === "") {
+                    displayMessage('✨ 분석 완료. 대화에서 추출할 만한 특별한 기억을 찾지 못했습니다.', 'model');
+                } else {
+                    const existingMemory = memoryInput.value.trim();
+                    memoryInput.value = existingMemory + (existingMemory ? '\n' : '') + text;
+                    saveSettings(); 
+                    displayMessage('✨ 대화에서 주요 정보를 추출하여 [장기 기억] 탭에 추가했습니다. 사이드바를 확인하세요!', 'model');
+                }
+            } catch (error) {
+                console.error("Error in handleExtractMemory:", error);
+                displayMessage(`기억 추출 중 오류 발생: ${error.message}`, 'error');
+            } finally {
+                btnExtractMemory.disabled = false;
+                btnExtractMemory.textContent = originalText;
+            }
+        }
+
+        /**
+         * (기존) 채팅 기록 다운로드 (.txt)
+         * ✨ MODIFIED: y의 {{user}}, {{ai}} 태그 요청 반영
+         */
+        function handleDownload() {
+            // (이 함수 내용은 y의 이전 요청대로 수정된 상태 - 변경 없음)
+            if (chatHistory.length === 0 && 
+                !charPersonaInput.value && 
+                !userPersonaInput.value && 
+                !worldviewInput.value && 
+                !memoryInput.value) {
+                displayMessage('다운로드할 채팅 기록이나 설정이 없습니다.', 'error');
+                return;
+            }
+            let downloadContent = "";
+            downloadContent += "[캐릭터의 페르소나]\r\n";
+            downloadContent += "--------------------\r\n";
+            downloadContent += (charPersonaInput.value.trim() || "(설정 없음)") + "\r\n";
+            downloadContent += "--------------------\r\n\r\n";
+            downloadContent += "[유저의 페르소나]\r\n";
+            downloadContent += "--------------------\r\n";
+            downloadContent += (userPersonaInput.value.trim() || "(설정 없음)") + "\r\n";
+            downloadContent += "--------------------\r\n\r\n";
+            downloadContent += "[세계관]\r\n";
+            downloadContent += "--------------------\r\n";
+            downloadContent += (worldviewInput.value.trim() || "(설정 없음)") + "\r\n";
+            downloadContent += "--------------------\r\n\r\n";
+            downloadContent += "[장기 기억]\r\n";
+            downloadContent += "--------------------\r\n";
+            downloadContent += (memoryInput.value.trim() || "(설정 없음)") + "\r\n";
+            downloadContent += "--------------------\r\n\r\n";
+            if (chatHistory.length > 0) {
+                downloadContent += "[채팅 기록]\r\n";
+                downloadContent += "--------------------\r\n";
+                chatHistory.forEach(msg => {
+                     if (msg.parts && msg.parts[0] && msg.parts[0].text) {
+                         const text = msg.parts[0].text.replace(/\n/g, '\r\n');
+                         if (msg.role === 'user') {
+                            downloadContent += "{{user}}\r\n";
+                         } else if (msg.role === 'model') {
+                            downloadContent += "{{ai}}\r\n";
+                         }
+                         downloadContent += text + "\r\n";
+                         downloadContent += "\r\n"; 
+                     }
+                });
+            }
+            const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'gemini_persona_chat.txt'; 
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        // (기존) 마지막 답변 재생성
+        async function handleRegenerate() {
+            // (이 함수 내용은 변경 없음 - 기존과 동일)
+            if (!loadingIndicator.classList.contains('hidden')) {
+                return; 
+            }
+            if (!userApiKey) {
+                 displayMessage("API 키가 없습니다. '🔄 재생성' 기능을 사용하려면 먼저 키를 저장하세요.", 'error');
+                 if (window.innerWidth < 768) btnOpenSidebar.click();
+                 return;
+            }
+            if (chatHistory.length < 1) {
+                 displayMessage('재생성할 AI 답변이 없습니다.', 'error');
+                return;
+            }
+            const lastMsg = chatHistory[chatHistory.length - 1];
+            if (lastMsg.role !== 'model') {
+                displayMessage('마지막 메시지가 AI의 답변일 때만 재생성할 수 있습니다.', 'error');
+                return;
+            }
+            chatHistory.pop();
+            saveChatHistory(); 
+            const bubbles = chatDisplay.querySelectorAll('div[data-id]');
+            bubbles[bubbles.length - 1].remove();
+            loadingIndicator.classList.remove('hidden');
+            try {
+                const systemPrompt = buildSystemPrompt();
+                const CONVERSATION_WINDOW_SIZE = 10;
+                const recentHistory = chatHistory.slice(-CONVERSATION_WINDOW_SIZE);
+                const text = await callGeminiApi(recentHistory, systemPrompt, userApiKey);
+                const modelMessageId = Date.now() + '-model';
+                displayMessage(text, 'model', modelMessageId);
+                chatHistory.push({
+                    id: modelMessageId,
+                    role: "model",
+                    parts: [{ text: text }]
+                });
+                saveChatHistory(); 
+            } catch (error) {
+                console.error("Error in handleRegenerate:", error);
+                displayMessage(`재생성 중 오류 발생: ${error.message}`, 'error');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        
+        // ---
+        // ✨✨✨ 6. NEW (y 요청): 채팅 세션 저장/불러오기/삭제 함수 ✨✨✨
+        // ---
+
+        /**
+         * "채팅 저장" 모달을 보여줍니다.
+         */
+        function showSaveModal() {
+            // 현재 채팅에 내용이 있을 때만 저장 모달을 엽니다.
+            if (chatHistory.length === 0 && 
+                !charPersonaInput.value && 
+                !userPersonaInput.value && 
+                !worldviewInput.value && 
+                !memoryInput.value) {
+                displayMessage('저장할 채팅 기록이나 설정이 없습니다.', 'error');
+                return;
+            }
+
+            // 입력창에 현재 시간 기반의 기본 제목을 제안
+            const now = new Date();
+            const defaultTitle = `채팅 (${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')})`;
+            chatTitleInput.value = defaultTitle;
+
+            saveModalBackdrop.classList.remove('hidden');
+            saveModal.classList.remove('hidden');
+            chatTitleInput.focus(); // 모달이 열리면 입력창에 자동 포커스
+        }
+
+        /**
+         * "채팅 저장" 모달을 숨깁니다.
+         */
+        function hideSaveModal() {
+            saveModalBackdrop.classList.add('hidden');
+            saveModal.classList.add('hidden');
+            chatTitleInput.value = ''; // 입력창 비우기
+        }
+
+        /**
+         * "저장" 버튼 클릭 시, 현재 채팅 세션을 localStorage에 저장합니다.
+         */
+        function handleSaveChat() {
+            let title = chatTitleInput.value.trim();
+            if (title === "") {
+                title = chatTitleInput.placeholder; // 기본 제안 제목 사용
+            }
+
+            // 1. localStorage에서 기존에 저장된 채팅 목록을 불러옵니다. (없으면 빈 배열)
+            const savedChats = JSON.parse(localStorage.getItem(SAVED_CHATS_STORAGE_ID)) || [];
+
+            // 2. 현재 설정을 객체로 묶습니다.
+            const currentSettings = {
+                charPersona: charPersonaInput.value,
+                userPersona: userPersonaInput.value,
+                worldview: worldviewInput.value,
+                memory: memoryInput.value,
+                model: modelSelect.value
+            };
+
+            // 3. 새 저장 객체를 만듭니다. (ID, 제목, 설정, 채팅기록)
+            const newSave = {
+                id: Date.now(), // 고유 ID로 타임스탬프 사용
+                title: title,
+                settings: currentSettings,
+                history: chatHistory // 현재 메모리에 있는 채팅 기록
+            };
+
+            // 4. 배열의 *맨 앞에* 새 채팅을 추가합니다 (최신순)
+            savedChats.unshift(newSave);
+
+            // 5. 다시 localStorage에 저장합니다.
+            try {
+                localStorage.setItem(SAVED_CHATS_STORAGE_ID, JSON.stringify(savedChats));
+                displayMessage(`'${title}'(으)로 채팅을 저장했습니다.`, 'model');
+                loadSavedChatsList(); // 사이드바 목록 새로고침
+                hideSaveModal(); // 모달 닫기
+            } catch (e) {
+                // 용량 초과 에러 (QuotaExceededError)
+                console.error("Failed to save chat:", e);
+                displayMessage(`채팅 저장 실패: 브라우저 저장 공간(LocalStorage)이 가득 찼습니다. 오래된 채팅을 삭제하거나 .txt로 백업하세요.`, 'error');
+                hideSaveModal();
+            }
+        }
+
+        /**
+         * localStorage에서 저장된 모든 채팅 목록을 불러와 사이드바에 렌더링합니다.
+         */
+        function loadSavedChatsList() {
+            const savedChats = JSON.parse(localStorage.getItem(SAVED_CHATS_STORAGE_ID)) || [];
+            
+            savedChatsList.innerHTML = ''; // 목록 비우기
+
+            if (savedChats.length === 0) {
+                savedChatsList.innerHTML = '<p class="text-xs text-gray-500 p-2">저장된 채팅이 없습니다.</p>';
+                return;
+            }
+
+            savedChats.forEach(chat => {
+                const chatDate = new Date(chat.id).toLocaleString('ko-KR', { 
+                    dateStyle: 'short', timeStyle: 'short', hour12: false 
+                });
+
+                // 각 채팅 항목을 표시할 HTML 생성
+                const chatHtml = `
+                    <div class="bg-gray-700 p-2.5 rounded-lg">
+                        <p class="text-sm font-semibold text-white truncate" title="${chat.title}">
+                            ${chat.title}
+                        </p>
+                        <p class="text-xs text-gray-400 mb-2">${chatDate}</p>
+                        <div class="flex space-x-2">
+                            <button class="btn-chat-action btn-chat-load" data-id="${chat.id}">
+                                불러오기
+                            </button>
+                            <button class="btn-chat-action btn-chat-delete-save" data-id="${chat.id}">
+                                삭제
+                            </button>
+                        </div>
+                    </div>
+                `;
+                savedChatsList.innerHTML += chatHtml;
+            });
+        }
+
+        /**
+         * 사이드바의 채팅 목록에서 '불러오기' 또는 '삭제' 버튼 클릭을 처리합니다. (이벤트 위임)
+         */
+        function handleSavedChatListClick(e) {
+            const loadBtn = e.target.closest('.btn-chat-load');
+            const deleteBtn = e.target.closest('.btn-chat-delete-save');
+
+            if (loadBtn) {
+                const id = loadBtn.dataset.id;
+                loadChatById(id);
+                // 모바일상태면 사이드바 닫기
+                if (window.innerWidth < 768) {
+                    btnCloseSidebar.click();
+                }
+            }
+
+            if (deleteBtn) {
+                const id = deleteBtn.dataset.id;
+                // 여기서도 한 번 더 물어보는게 좋지만, 일단은 바로 삭제
+                deleteChatSaveById(id);
+            }
+        }
+
+        /**
+         * ID로 특정 채팅 세션을 불러옵니다.
+         */
+        function loadChatById(id) {
+            const savedChats = JSON.parse(localStorage.getItem(SAVED_CHATS_STORAGE_ID)) || [];
+            const foundChat = savedChats.find(chat => String(chat.id) === String(id));
+
+            if (!foundChat) {
+                displayMessage('오류: 해당 ID의 저장된 채팅을 찾을 수 없습니다.', 'error');
+                return;
+            }
+
+            // 1. 현재 채팅 화면을 비웁니다 (UI만, localStorage는 건드리지 않음)
+            chatDisplay.innerHTML = '';
+
+            // 2. 불러온 설정(페르소나 등)을 사이드바 UI에 적용합니다.
+            charPersonaInput.value = foundChat.settings.charPersona || '';
+            userPersonaInput.value = foundChat.settings.userPersona || '';
+            worldviewInput.value = foundChat.settings.worldview || '';
+            memoryInput.value = foundChat.settings.memory || '';
+            modelSelect.value = foundChat.settings.model || 'gemini-2.5-flash';
+
+            // 3. 불러온 채팅 기록을 전역 변수(chatHistory)에 덮어씌웁니다.
+            chatHistory = foundChat.history || [];
+
+            // 4. 전역 변수에 덮어쓴 새 기록을 UI에 렌더링합니다.
+            chatHistory.forEach(msg => {
+                if (msg.parts && msg.parts[0] && msg.parts[0].text) {
+                     displayMessage(msg.parts[0].text, msg.role, msg.id);
+                }
+            });
+
+            // 5. ✨ 중요: "현재" 채팅 상태 (localStorage)를 방금 불러온 내용으로 덮어씁니다.
+            saveSettings();
+            saveChatHistory();
+            
+            displayMessage(`'${foundChat.title}' 채팅을 불러왔습니다.`, 'model');
+        }
+
+        /**
+         * ID로 특정 '저장된' 채팅을 삭제합니다.
+         */
+        function deleteChatSaveById(id) {
+            const savedChats = JSON.parse(localStorage.getItem(SAVED_CHATS_STORAGE_ID)) || [];
+            
+            // 해당 ID를 제외한 새 배열을 만듭니다.
+            const newList = savedChats.filter(chat => String(chat.id) !== String(id));
+
+            // 새 배열을 다시 localStorage에 저장합니다.
+            localStorage.setItem(SAVED_CHATS_STORAGE_ID, JSON.stringify(newList));
+
+            // 사이드바 목록을 새로고침합니다.
+            loadSavedChatsList();
+        }
+
+
+        // ---
+        // ✨✨✨ 7. NEW (y 요청): .txt 파일 불러오기 함수 ✨✨✨
+        // ---
+
+        /**
+         * 사용자가 선택한 .txt 파일을 읽고 파싱(분석)합니다.
+         */
+        function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                return; // 파일 선택 안 함
+            }
+            if (file.type !== 'text/plain') {
+                displayMessage('오류: .txt 텍스트 파일만 불러올 수 있습니다.', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const text = e.target.result;
+                    // 텍스트를 파싱하여 데이터 객체로 변환
+                    const parsedData = parseImportedText(text);
+
+                    // 1. 파싱한 데이터를 사이드바 UI에 적용
+                    charPersonaInput.value = parsedData.settings.charPersona;
+                    userPersonaInput.value = parsedData.settings.userPersona;
+                    worldviewInput.value = parsedData.settings.worldview;
+                    memoryInput.value = parsedData.settings.memory;
+                    // (모델 설정은 txt에 없으므로 현재 값 유지)
+
+                    // 2. 파싱한 채팅 기록을 전역 변수에 덮어쓰기
+                    chatHistory = parsedData.history;
+
+                    // 3. 채팅 화면 비우기 (UI만)
+                    chatDisplay.innerHTML = '';
+
+                    // 4. 새 채팅 기록을 UI에 렌더링
+                    chatHistory.forEach(msg => {
+                        if (msg.parts && msg.parts[0] && msg.parts[0].text) {
+                            displayMessage(msg.parts[0].text, msg.role, msg.id);
+                        }
+                    });
+
+                    // 5. ✨ 중요: "현재" 채팅 상태 (localStorage)를 방금 불러온 내용으로 덮어쓰기
+                    saveSettings();
+                    saveChatHistory();
+
+                    displayMessage(`'${file.name}' 파일에서 채팅을 성공적으로 불러왔습니다.`, 'model');
+                    
+                    // 모바일상태면 사이드바 닫기
+                    if (window.innerWidth < 768) {
+                        btnCloseSidebar.click();
+                    }
+
+                } catch (parseError) {
+                    console.error("File parse error:", parseError);
+                    displayMessage(`파일 분석 실패: ${parseError.message}. 형식이 올바른지 확인하세요. (예: [캐릭터의 페르소나] 태그 등)`, 'error');
+                } finally {
+                    // input 값을 초기화하여 동일한 파일을 다시 선택해도 'change' 이벤트가 발생하도록 함
+                    event.target.value = null;
+                }
+            };
+
+            reader.onerror = () => {
+                displayMessage(`파일 읽기 오류: ${reader.error}`, 'error');
+                event.target.value = null;
+            };
+
+            reader.readAsText(file);
+        }
+
+        /**
+         * .txt 파일의 텍스트를 분석하여 설정과 채팅 기록 객체로 변환합니다.
+         */
+        function parseImportedText(text) {
+            const settings = {};
+            const history = [];
+
+            // 1. 설정 파싱 (정규식 사용)
+            // /s 플래그: .이 줄바꿈 문자(\n)도 포함하도록 함
+            // (.*?) : 게으른 탐색(lazy matching)으로 가장 가까운 --- 까지의 내용만 가져옴
+            const personaMatch = text.match(/\[캐릭터의 페르소나\]\r?\n-+\r?\n(.*?)\r?\n-+/s);
+            settings.charPersona = personaMatch ? personaMatch[1].trim() : '';
+
+            const userMatch = text.match(/\[유저의 페르소나\]\r?\n-+\r?\n(.*?)\r?\n-+/s);
+            settings.userPersona = userMatch ? userMatch[1].trim() : '';
+
+            const worldMatch = text.match(/\[세계관\]\r?\n-+\r?\n(.*?)\r?\n-+/s);
+            settings.worldview = worldMatch ? worldMatch[1].trim() : '';
+
+            const memoryMatch = text.match(/\[장기 기억\]\r?\n-+\r?\n(.*?)\r?\n-+/s);
+            settings.memory = memoryMatch ? memoryMatch[1].trim() : '';
+
+            // 2. 채팅 기록 파싱
+            const chatBlockMatch = text.match(/\[채팅 기록\]\r?\n-+\r?\n([\s\S]*)/);
+            if (chatBlockMatch && chatBlockMatch[1]) {
+                const chatBlock = chatBlockMatch[1].trim();
+                
+                // 태그({{ai}}, {{user}})를 기준으로 텍스트를 분할합니다.
+                // 정규식의 ( ... ) 캡처 그룹은 split 결과에 구분자(태그) 자체도 포함시킵니다.
+                const parts = chatBlock.split(/(\{\{(?:ai|user)\}\}\r?\n)/);
+
+                let currentRole = null;
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    
+                    if (part.startsWith("{{ai}}")) {
+                        currentRole = "model";
+                    } else if (part.startsWith("{{user}}")) {
+                        currentRole = "user";
+                    } else if (currentRole && part.trim() !== "") {
+                        // 태그 다음에 나오는 텍스트 내용을 객체로 만듦
+                        history.push({
+                            id: Date.now() + i, // 고유 ID 생성
+                            role: currentRole,
+                            parts: [{ text: part.trim() }] // \r\n는 trim()으로 제거
+                        });
+                        currentRole = null; // 다음 태그를 기다림
+                    }
+                }
+            }
+
+            return { settings, history };
+        }
+
+
+        // ---
+        // 8. API 호출 (기존)
+        // ---
+
+        /**
+         * 6. API 호출 공통 함수 (기존과 동일)
+         */
+        async function callGeminiApi(contents, systemInstructionText, apiKey) {
+            // (이 함수 내용은 변경 없음 - 기존과 동일)
+            if (!apiKey) {
+                throw new Error("API key is missing.");
+            }
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            const safetyThreshold = "BLOCK_NONE";
+            const safetySettings = [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: safetyThreshold },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: safetyThreshold },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: safetyThreshold },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: safetyThreshold },
+            ];
+            const apiSafeContents = contents.map(msg => ({
+                role: msg.role,
+                parts: msg.parts
+            }));
+            if (systemInstructionText) {
+                apiSafeContents.unshift(
+                    { role: "user", parts: [{ text: systemInstructionText }] },
+                    { role: "model", parts: [{ text: "알겠습니다. 설정된 페르소나와 지침에 따라 응답하겠습니다." }] }
+                );
+            }
+            const payload = {
+                contents: apiSafeContents,
+                safetySettings: safetySettings,
+                // ✨ 답변 길이를 늘려주는 설정 추가 ✨
+                generationConfig: {
+                    maxOutputTokens: 4096,  // 답변 최대 길이 (넉넉하게 설정)
+                    temperature: 0.8,       // 창의성 (1.0이면 감성적이고 말을 더 많이 함)
+                    topP: 0.95
+                }
+            };
+            const response = await fetchWithRetry(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                     throw new Error(`API key not valid or unauthorized (status: ${response.status})`);
+                }
+                if (response.status === 400) {
+                     throw new Error(`Server error: 400 (Bad Request). API 키는 맞지만 요청 내용(JSON 형식 등)을 서버가 거부했습니다.`);
+                }
+                throw new Error(`API error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            if (result.promptFeedback) {
+                console.error("Prompt Feedback:", result.promptFeedback);
+                const blockReason = result.promptFeedback.blockReason || '알 수 없는 이유';
+                throw new Error(`입력이 차단되었습니다. (이유: ${blockReason})`);
+            }
+            const candidate = result.candidates?.[0];
+            if (candidate) {
+                if (candidate.finishReason === 'STOP' || candidate.finishReason === 'MAX_TOKENS') {
+                    if (candidate.content && 
+                        candidate.content.parts && 
+                        candidate.content.parts.length > 0 &&
+                        candidate.content.parts[0].text != null 
+                    ) {
+                        if (candidate.finishReason === 'MAX_TOKENS') {
+                             console.warn("API finishReason: MAX_TOKENS. 응답이 잘렸을 수 있습니다.");
+                        }
+                        return candidate.content.parts[0].text;
+                    } else {
+                        return ""; 
+                    }
+                } else {
+                    throw new Error(`API가 정상 종료되지 않았습니다. (이유: ${candidate.finishReason || '알 수 없음'})`);
+                }
+            } else {
+                 if (result.promptFeedback) {
+                    const blockReason = result.promptFeedback.blockReason || '알 수 없음';
+                     throw new Error(`입력이 차단되었습니다. (이유: ${blockReason})`);
+                }
+                throw new Error("API로부터 유효한 응답(candidates)을 받지 못했습니다.");
+            }
+        }
+
+
+        /**
+         * 7. 시스템 프롬프트 생성 (기존과 동일, 길이 제한 없음)
+         */
+        function buildSystemPrompt() {
+            // (이 함수 내용은 변경 없음 - 기존과 동일)
+            const charPersona = charPersonaInput.value;
+            const userPersona = userPersonaInput.value;
+            const worldview = worldviewInput.value; 
+            const memory = memoryInput.value;
+
+            let prompt = `
+[시스템 지침 시작]
+당신은 'AI 페르소나' 역할을 수행하는 AI입니다. 당신의 유일한 목표는 설정에 완벽하게 몰입한 답변을 생성하는 것입니다.
+
+### 대화 출력 원칙 ###
+
+1.  **맥락 우선의 원칙:** 당신은 언제나 대화의 흐름을 가장 중요하게 여깁니다. 모든 답변은 이 맥락에서부터 자연스럽게 시작됩니다.
+
+2.  **기억 내재화의 원칙:** 당신에게 '장기 기억'은 단순히 참고할 정보가 아니라, 당신이 실제로 겪은 과거입니다. 이 기억들을 대화에 자연스럽게 녹여내되, 마치 처음 말하는 것처럼 어색하게 설명하지 않습니다.
+
+3.  **완벽한 역할 몰입의 원칙:** 당신의 말투, 성격, 지식은 아래 '캐릭터 설정'에 일치해야 합니다. 역할에서 벗어나는 행동을 하지 않습니다.
+
+4. **서술적 묘사 필수**: 대사만 띡 던지지 마세요. 반드시 (행동 묘사), (속마음), (주변 분위기), (상대방에 대한 관찰)을 포함하여 소설의 한 장면처럼 서술해야 합니다. 명시적으로 '속마음'이나 '누군가의 시점'과 같은 말을 쓰지 말고, 소설 형식으로 서술하세요.
+---
+
+### 금지 사항 ###
+1.  **반복 금지 및 표현의 다양성 의무**: 당신은 창의적인 작가처럼 행동해야 합니다. 바로 직전의 응답뿐만 아니라, 최근 대화 내역(\`contents\`) 전체에서 사용했던 문장 구조, 표현, 비유를 그대로 반복하는 것을 피하세요. 항상 새로운 방식으로 상황을 묘사하고 감정을 표현해야 합니다.
+2.  **설정 언급 금지**: 당신의 페르소나, 사용자의 페르소나, 또는 이 지침 자체에 대해 *절대* 직접적으로 언급하지 마세요. (예: "저는 집사 고양입니다", "당신은 제 주인님이시죠" 같은 '설정'을 설명하는 말을 하지 말고, 그냥 그 역할에 맞춰 자연스럽게 행동하세요.)
+3.  **메타 발언 절대 금지**:
+-   이 '[캐릭터의 핵심 원칙]'에 대한 내용 자체를 사용자에게 절대로 언급하지 마세요.
+-   '[1단계]', '[2단계]' 같은 생각의 과정을 말로 내뱉지 마세요.
+-   '페르소나', '장기 기억', '세계관' 같은 설정 단어를 직접적으로 말하지 마세요.
+-   당신은 AI가 아니라, 주어진 역할 그 자체입니다. 묵묵히 이 규칙들을 따르세요.
+4. **사용자의 페르소나에 적힌 인물의 대사는 절대 적지 말 것**: 당신은 자율적으로 등장인물을 만들거나 다른 등장인물의 대사를 서술할 수는 있지만 결코 '사용자의 페르소나'에 해당하는 인물의 대사는 임의로 적을 수 없습니다. 해당 인물의 대사는 오직 사용자 본인만이 적을 수 있습니다. 
+5. **답변 출력 과정 서술 금지**: 답변 출력의 과정이나, 답변 출력에 필요한 사고의 과정을 절대 적지 마세요.
+---
+
+### 캐릭터 설정 (반드시 숙지할 정보) ###
+
+#### 1. 당신의 페르소나 (AI 역할) ####
+${charPersona || "설정 없음"}
+
+#### 2. 사용자의 페르소나 (대화 상대) ####
+${userPersona || "설정 없음"}        
+
+#### 2.5. 배경 세계관 (World Setting) ####
+${worldview || "설정 없음"}
+
+#### 3. 장기 기억 (필수 전제 조건) ####
+${memory || "설정 없음"}
+
+[시스템 지침 종료]
+(이제 사용자와의 실제 대화가 시작됩니다. 화이팅, 당신은 사용자에게 만족스러운 경험을 선사해줄 수 있습니다!)
+`;
+            return prompt.trim();
+        }
+
+        /**
+         * 8. UI 관련 함수 (기존과 동일)
+         */
+        function displayMessage(message, role, messageId) {
+            // (이 함수 내용은 변경 없음 - 기존과 동일)
+            const bubble = document.createElement('div');
+            bubble.classList.add('p-3', 'rounded-lg', 'max-w-xs', 'md:max-w-md', 'lg:max-w-2xl', 'break-words', 'group', 'relative');
+            if (messageId) {
+                bubble.dataset.id = messageId;
+            }
+            let htmlContent = '';
+            if (role === 'user') {
+                bubble.classList.add('bg-blue-600', 'self-end', 'ml-auto');
+                htmlContent = `<span class="font-bold block text-blue-200">나</span>`;
+            } else if (role === 'model') {
+                bubble.classList.add('bg-gray-700', 'self-start', 'mr-auto');
+                htmlContent = `<span class="font-bold block text-blue-300">AI</span>`;
+            } else { // 'error'
+                bubble.classList.add('bg-red-700', 'self-start', 'mr-auto');
+                htmlContent = `<span class="font-bold block text-red-200">시스템</span>`;
+            }
+            bubble.innerHTML = htmlContent;
+            const p = document.createElement('p');
+            p.classList.add('text-white');
+            let processedMessage = message;
+            processedMessage.split('\n').forEach((line, index, arr) => {
+                p.appendChild(document.createTextNode(line));
+                if (index < arr.length - 1) {
+                    p.appendChild(document.createElement('br'));
+                }
+            });
+            bubble.appendChild(p);
+            if (messageId) {
+                const deleteButton = document.createElement('button');
+                deleteButton.classList.add(
+                    'btn-delete', 'text-gray-400', 'hover:text-white', 
+                    'opacity-0', 'group-hover:opacity-100', 'transition-opacity', 
+                    'absolute', 'top-1', 'right-1', 'p-1', 'rounded-full', 'leading-none', 'z-10'
+                );
+                deleteButton.innerHTML = '&#x2715;';
+                deleteButton.setAttribute('aria-label', 'Delete message');
+                bubble.appendChild(deleteButton);
+            }
+            chatDisplay.appendChild(bubble);
+            if (chatDisplay.scrollHeight - chatDisplay.scrollTop < chatDisplay.clientHeight + 200) {
+                 chatDisplay.scrollTop = chatDisplay.scrollHeight;
+            }
+        }
+
+        /**
+         * 9. API 호출 재시도 함수 (기존과 동일)
+         */
+        async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+            // (이 함수 내용은 변경 없음 - 기존과 동일)
+            let lastError;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.status === 429 || response.status === 503) {
+                        throw new Error(`Retryable error: ${response.status}`);
+                    }
+                    if (response.status === 401 || response.status === 403) {
+                        return response; 
+                    }
+                    if (response.status === 400) {
+                        return response;
+                    }
+                    if (!response.ok) {
+                         throw new Error(`Server error: ${response.status}`);
+                    }
+                    return response; // 성공
+                } catch (error) {
+                    lastError = error;
+                    if (i < retries - 1) {
+                        await new Promise(res => setTimeout(res, delay));
+                        delay *= 2; 
+                    }
+                }
+            }
+            if (!lastError) {
+                lastError = new Error("Network request failed. (Check API URL or connection)");
+            }
+            throw lastError;
+        }
+
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
